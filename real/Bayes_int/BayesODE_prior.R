@@ -1,0 +1,102 @@
+# compile required cpp files
+compile("spline_int.cpp")
+dyn.load(dynlib("spline_int"))
+
+############################# Real: GRN #############################
+# set the initial value for b
+FhNfdPar <- fdPar(bsbasis, int2Lfd(2), 0.1)
+DEfd0 <- smooth.basis(times, apply(y, c(1,2),mean), FhNfdPar)$fd
+b <- DEfd0$coefs
+xx <- I0quadbasismat%*%b
+ix <- I1quadbasismat%*%b
+norm_ix <- normalize(ix)
+ix <- 1/(1+exp(-norm_ix))
+# set the initial value for a and theta
+for (i in 1:num_sigma) {
+  assign(paste("int_bs_ix", i, sep = ""), integral_bs(cal_basis(ix[,i],x_knots)))
+}
+pos.len <- seq(0,1,length.out=x_knots+2)
+pos <- pos.len[-c(1,length(pos.len))]
+int_bs_ix <- scale(out_quadpts,scale=F)
+for (ii in 1:num_sigma) {
+  int_bs_ix <- cbind(int_bs_ix, get(paste("int_bs_ix", i, sep = "")))
+}
+a0 <- rep(NA, num_sigma)
+a <- array(NA, dim=c(dim(int_bs_ix1)[2], num_sigma, num_sigma))
+graph = matrix(NA, nr=num_sigma,nc=num_sigma)
+for (i in 1:num_sigma) {
+  result <- est_coef(scale(xx[,i],scale=F), int_bs_ix)
+  a[,i,] <- result$beta
+  a0[i] <- result$a0
+  graph[i,] <- result$graph
+}
+graph=t(graph)
+theta = matrix(rep(0,num_sigma*num_sigma),nc=num_sigma)
+theta[!graph] <- 1e-10; theta[graph] <- 1-1e-10
+
+# define the initial function
+init_logsigma <- rep(log(0.1), num_sigma)
+init_fn <- function() list(logsigma=init_logsigma, b=b, a = a,
+                           theta=theta,a0=a0)
+# set the lower bound for parameter
+lower <- c(
+  rep(-Inf, length(b)+num_sigma),
+  rep(-Inf, length(a)),
+  matrix(rep(0,num_sigma*num_sigma),ncol=num_sigma),
+  rep(-Inf, num_sigma)
+)
+# set the upper bound for parameter
+upper <- c(
+  rep(Inf, length(b)+num_sigma),
+  rep(Inf, length(a)),
+  matrix(rep(1,num_sigma*num_sigma),ncol=num_sigma),
+  rep(Inf, num_sigma)
+)
+# set the parameters
+parameters <- list(logsigma=rep(log(0.1),num_sigma), b=b,
+                   a=a, theta=theta,a0=a0
+)
+new_data <- list(y=y, lambda = lambda,
+                 I0quadbasismat = as(I0quadbasismat-phi0basismat, "dgCMatrix"),
+                 I1quadbasismat = as(I1quadbasismat,'dgCMatrix'), 
+                 basismat = as(basismat,'dgCMatrix'),
+                 out_nquad = out_nquad,
+                 pos = pos, 
+                 out_quadpts = out_quadpts, 
+                 out_quadwts = out_quadwts, 
+                 in_quadwts_vec = in_quadwts_vec,eta=eta)
+options(mc.cores = parallel::detectCores())
+obj <- MakeADFun(new_data, parameters, DLL="spline_int")
+# run the model
+# read the seed list
+sed_lst <- read.table('seeds.txt')
+sed_lst <- sed_lst[1:100,]
+comb_lst <- rbind(c(8,0.48), c(10,0.6), c(12,0.72), c(12.5,0.75), c(10/6*5,0.5))
+
+for (j in 1:10){
+  sed = sed_lst[j]
+  for (comb in 1:nrow(comb_lst)) {
+    eta = c(comb_lst[comb,1],comb_lst[comb,2])
+    new_data <- list(y=y, lambda = lambda,
+                     I0quadbasismat = as(I0quadbasismat-phi0basismat, "dgCMatrix"),
+                     I1quadbasismat = as(I1quadbasismat,'dgCMatrix'), 
+                     basismat = as(basismat,'dgCMatrix'),
+                     out_nquad = out_nquad,
+                     pos = pos, 
+                     out_quadpts = out_quadpts, 
+                     out_quadwts = out_quadwts, 
+                     in_quadwts_vec = in_quadwts_vec,eta=eta)
+    options(mc.cores = parallel::detectCores())
+    obj <- MakeADFun(new_data, parameters, DLL="spline_int")
+    start_time <- Sys.time()
+    new_fit = tmbstan(obj,
+                      lower = lower, upper = upper,
+                      init = init_fn,
+                      chains = 1, iter = 1000,laplace = FALSE,
+                      control = list(adapt_delta = 0.85, max_treedepth = 13))
+    end_time <- Sys.time()
+    runtime <- difftime(end_time, start_time, units = "hours")
+    saveRDS(runtime, file = paste('time_eta', eta[1], '_',eta[2],'.',sed, 'seed.', lambda, 'lambda.rds', sep=""))
+    saveRDS(new_fit,file = paste('real_eta',  eta[1], '_',eta[2],'.result.', sed, 'seed.', lambda, 'lambda.rds', sep=""))
+  }
+}

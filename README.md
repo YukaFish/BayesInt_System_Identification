@@ -1,10 +1,16 @@
+This repo contains code for reproducting the results from 
+
+Xu, M., S. W. K. Wong and P. Sang (2025). A Bayesian collocation integral method for system identification of ordinary differential equations. Biometrics, 81(4), ujaf141.
+
 **Summary**:
+-------
 
 - The folders sim and real contain the full setups for the simulation studies and real data analysis presented in the manuscript.
 * sim: Runs 100 repetitions comparing different methods.
 * real: Contains the real data analysis.
 
 **Quick Start**:
+-------
 
 - To reproduce results for each method in the simulation or real data analysis, run 'main.R' in the corresponding folder.
 - To change the number of observations for the simulated system, modify the variable 'obs_choice' or 'N' (default: 41 observations).
@@ -13,6 +19,7 @@
 
 
 **Simulation**: 
+-------
 
 - The 'simulation' folder includes four subfolders, each corresponding to a specific simulation study:
 * add_ode: Benchmark system (17) from Section 3 of the main text.
@@ -40,6 +47,7 @@
 
 
 **Real Data**: 
+-------
 
 - This folder contains our proposed integral method for real data in the manuscript, which has the following files:
 * main.R: Main script to run the analysis.
@@ -55,6 +63,10 @@
 
 
 **Reference**:
+-------
+
 [1] Zhang, N., Nanshan, M., and Cao, J. (2022). A joint estimation approach to sparse additive ordinary differential equations. Statistics and Computing 32, 69.
+
 [2] Chen, S., Shojaie, A., and Witten, D. M. (2017). Network reconstruction from high-dimensional ordinary differential equations. Journal of the American Statistical Association 112, 1697–1707.
+
 [3] Strimmer, K. (2022). longitudinal: Analysis of Multiple Time Course Data. R package version 1.1.13, <https://CRAN.R-project.org/package=longitudinal>.
